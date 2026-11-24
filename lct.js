@@ -24,7 +24,7 @@
 
   function renderScans(box, list, emptyMsg) {
     box.innerHTML = "";
-    if (!list || !list.length) { box.appendChild(el("p", "empty", emptyMsg)); return; }
+    if (!list || !list.length) { if (emptyMsg) box.appendChild(el("p", "empty", emptyMsg)); return; }
     var grid = el("div", "scans");
     list.forEach(function (it, i) {
       var f = el("figure", "scan"), b = el("button"), img = el("img");
@@ -47,7 +47,7 @@
     var R = (P.readings || {})[page] || {};
     document.querySelectorAll("[data-slot]").forEach(function (box) {
       var k = box.getAttribute("data-slot");
-      if (k === "scans") renderScans(box, R.scans, "Annotated pages will be added here.");
+      if (k === "scans") renderScans(box, R.scans, "");
       if (k === "notes") renderScans(box, R.notes, "Scanned class notes will be added here.");
       if (k === "analysis") renderText(box, R.analysis, "The analysis of this essay will be added here.");
       if (k === "summary") renderText(box, R.summary, "The summary of learning will be added here.");
