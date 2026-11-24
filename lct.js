@@ -42,11 +42,20 @@
     var d = el("div", "prose"); list.forEach(function (p) { d.appendChild(el("p", "", p)); }); box.appendChild(d);
   }
 
+  function renderLink(box, url) {
+    box.innerHTML = ""; url = (url || "").trim();
+    if (!/^https?:\/\//i.test(url)) return;
+    var p = el("p", "readlink"), a = el("a", "", url);
+    a.href = url; a.target = "_blank"; a.rel = "noopener";
+    p.appendChild(document.createTextNode("Essay link: ")); p.appendChild(a); box.appendChild(p);
+  }
+
   var page = document.body.getAttribute("data-reading");
   if (page) {
     var R = (P.readings || {})[page] || {};
     document.querySelectorAll("[data-slot]").forEach(function (box) {
       var k = box.getAttribute("data-slot");
+      if (k === "link") renderLink(box, R.link);
       if (k === "scans") renderScans(box, R.scans, "");
       if (k === "notes") renderScans(box, R.notes, "Scanned class notes will be added here.");
       if (k === "analysis") renderText(box, R.analysis, "The analysis of this essay will be added here.");
