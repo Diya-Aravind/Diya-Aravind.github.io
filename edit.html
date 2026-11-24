@@ -37,7 +37,7 @@ hr{border:0;border-top:1px solid #cfd6e1;margin:26px 0}
 <body>
 <div class="w">
 <h1>Edit your portfolio</h1>
-<p class="mut">Private editing page. Type your text, add your photos, then press Save. Only someone with your GitHub key can change the site.</p>
+<p class="mut">Private editing page. Type your text, paste your links, then press Save. Only someone with your GitHub key can change the site.</p>
 
 <div class="card" id="connect">
   <h2>1. Connect</h2>
@@ -81,17 +81,15 @@ hr{border:0;border-top:1px solid #cfd6e1;margin:26px 0}
   "use strict";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   function el(t, c, x) { var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
-  var READINGS = [["author", "What Is an Author?"], ["derrida", "Structure, Sign, and Play"]];
-  var state = null, sha = null, conn = {}, busy = false;
+  var READINGS = [["author", "What Is an Author?", "Michel Foucault, 1969"], ["derrida", "Structure, Sign, and Play in the Discourse of the Human Sciences", "Jacques Derrida, 1966"]];
+  var state = null, conn = {}, busy = false, fields = {};
 
-  // ---- first-time defaults
   var host = location.hostname;
   if (/\.github\.io$/i.test(host)) { $("#owner").value = host.split(".")[0]; $("#repo").value = host; }
   try { var t = localStorage.getItem("lct_token"); if (t) { $("#token").value = t; $("#remember").checked = true; } } catch (e) {}
 
   function say(text, kind) { var m = $("#msg"); m.className = kind || ""; m.textContent = text; m.style.display = text ? "block" : "none"; }
 
-  // ---- GitHub
   function api(method, path, body) {
     var url = "https://api.github.com/repos/" + encodeURIComponent(conn.owner) + "/" + encodeURIComponent(conn.repo) + "/contents/" + path;
     return fetch(url, { method: method, headers: { "Authorization": "Bearer " + conn.token, "Accept": "application/vnd.github+json" }, body: body ? JSON.stringify(body) : undefined })
@@ -112,138 +110,73 @@ hr{border:0;border-top:1px solid #cfd6e1;margin:26px 0}
   }
   function b64decode(s) { var bin = atob(s.replace(/\s/g, "")), a = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return new TextDecoder("utf-8").decode(a); }
   function b64encode(s) { var a = new TextEncoder().encode(s), bin = ""; for (var i = 0; i < a.length; i += 8192) bin += String.fromCharCode.apply(null, a.subarray(i, i + 8192)); return btoa(bin); }
-
   function parseContent(text) {
     var w = {};
     try { new Function("window", text)(w); } catch (e) { throw new Error("content.js on the site could not be read"); }
     return w.PORTFOLIO || {};
   }
   function normalise(P) {
-    P = P || {}; P.student = P.student || ""; P.register = P.register || ""; P.readings = P.readings || {};
+    var out = { student: P.student || "", register: P.register || "", readings: {}, proposal: { link: ((P.proposal || {}).link) || "" } };
     READINGS.forEach(function (r) {
-      var R = P.readings[r[0]] = P.readings[r[0]] || {};
-      R.link = R.link || "";
-      ["scans", "notes", "analysis", "summary"].forEach(function (k) { if (!Array.isArray(R[k])) R[k] = []; });
-      R.scans = R.scans.map(function (x) { return { src: x.src, alt: x.alt || "" }; });
-      R.notes = R.notes.map(function (x) { return { src: x.src, alt: x.alt || "" }; });
+      var R = (P.readings || {})[r[0]] || {};
+      out.readings[r[0]] = { byline: R.byline || r[2], link: R.link || "", reflection: Array.isArray(R.reflection) ? R.reflection : (Array.isArray(R.analysis) ? R.analysis : []) };
     });
-    return P;
+    return out;
   }
 
-  // ---- connect
   $("#load").addEventListener("click", function () {
     conn = { owner: $("#owner").value.trim(), repo: $("#repo").value.trim(), token: $("#token").value.trim() };
     if (!conn.owner || !conn.repo || !conn.token) { say("Fill in your username, repository name and key first.", "err"); return; }
     try { if ($("#remember").checked) localStorage.setItem("lct_token", conn.token); else localStorage.removeItem("lct_token"); } catch (e) {}
     say("Loading your site...");
-    api("GET", "content.js").then(function (j) {
-      sha = j.sha; state = normalise(parseContent(b64decode(j.content))); show();
-    }).catch(function (e) {
-      if (e && e.status === 404) { sha = null; state = normalise({}); show(); } else say(friendly(e), "err");
-    });
+    api("GET", "content.js").then(function (j) { state = normalise(parseContent(b64decode(j.content))); show(); })
+      .catch(function (e) { if (e && e.status === 404) { state = normalise({}); show(); } else say(friendly(e), "err"); });
   });
 
-  // ---- build the form
-  var boxes = {};
+  function field(card, label, node, hint) {
+    card.appendChild(el("label", "", label)); if (hint) card.appendChild(el("p", "mut", hint)); card.appendChild(node); return node;
+  }
   function show() {
-    say("");
-    $("#editor").hidden = false;
+    say(""); $("#editor").hidden = false;
     $("#student").value = state.student; $("#register").value = state.register;
-    var host = $("#readings"); host.innerHTML = ""; boxes = {};
+    var host = $("#readings"); host.innerHTML = ""; fields = {};
     READINGS.forEach(function (r) {
-      var key = r[0], R = state.readings[key], b = boxes[key] = {};
-      var card = el("div", "card"); card.appendChild(el("h2", "", r[1]));
-      card.appendChild(el("label", "", "Link to the essay (Google Drive or any web address)"));
-      b.link = el("input"); b.link.type = "text"; b.link.value = R.link; card.appendChild(b.link);
-      card.appendChild(el("h3", "", "Annotated essay (photos of your pages)"));
-      b.scansBox = el("div", "imgs"); card.appendChild(b.scansBox); card.appendChild(adder(key, "scans"));
-      card.appendChild(el("h3", "", "Analysis"));
-      card.appendChild(el("p", "mut", "Type or paste your text. Leave an empty line between paragraphs."));
-      b.analysis = el("textarea"); b.analysis.value = R.analysis.join("\n\n"); card.appendChild(b.analysis);
-      card.appendChild(el("h3", "", "Class notes (photos or scans)"));
-      b.notesBox = el("div", "imgs"); card.appendChild(b.notesBox); card.appendChild(adder(key, "notes"));
-      card.appendChild(el("h3", "", "Summary of learning"));
-      card.appendChild(el("p", "mut", "Leave an empty line between paragraphs."));
-      b.summary = el("textarea"); b.summary.value = R.summary.join("\n\n"); card.appendChild(b.summary);
+      var R = state.readings[r[0]], f = fields[r[0]] = {}, card = el("div", "card");
+      card.appendChild(el("h2", "", r[1]));
+      f.byline = el("input"); f.byline.type = "text"; f.byline.value = R.byline;
+      field(card, "Author and year (shown under the essay name)", f.byline);
+      f.link = el("input"); f.link.type = "text"; f.link.value = R.link; f.link.placeholder = "https://drive.google.com/...";
+      field(card, "Annotations and Class Notes: paste your Drive link", f.link);
+      f.reflection = el("textarea"); f.reflection.value = R.reflection.join("\n\n");
+      field(card, "My Reflection", f.reflection, "Type or paste your text. Leave an empty line between paragraphs.");
       host.appendChild(card);
-      drawImgs(key, "scans"); drawImgs(key, "notes");
     });
-  }
-  function adder(key, kind) {
-    var row = el("div", "row"), inp = el("input"); inp.type = "file"; inp.accept = "image/*"; inp.multiple = true; inp.style.display = "none";
-    var btn = el("button", "", "Add photos"); btn.type = "button";
-    btn.addEventListener("click", function () { inp.click(); });
-    inp.addEventListener("change", function () {
-      var files = Array.prototype.slice.call(inp.files); inp.value = "";
-      files.reduce(function (p, f) {
-        return p.then(function () { return shrink(f).then(function (d) { grab(key); state.readings[key][kind].push({ src: "", alt: "", data: d }); }); })
-          .catch(function (e) { say(e.message, "err"); });
-      }, Promise.resolve()).then(function () { drawImgs(key, kind); });
-    });
-    row.appendChild(btn); row.appendChild(inp); return row;
-  }
-  function shrink(file) {
-    return new Promise(function (res, rej) {
-      var url = URL.createObjectURL(file), im = new Image();
-      im.onload = function () {
-        var s = Math.min(1, 2000 / Math.max(im.naturalWidth, im.naturalHeight)), c = document.createElement("canvas");
-        c.width = Math.round(im.naturalWidth * s); c.height = Math.round(im.naturalHeight * s);
-        var x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height);
-        URL.revokeObjectURL(url); res(c.toDataURL("image/jpeg", 0.88));
-      };
-      im.onerror = function () { URL.revokeObjectURL(url); rej(new Error("Could not open " + file.name + ". Use a JPG or PNG photo.")); };
-      im.src = url;
-    });
-  }
-  function drawImgs(key, kind) {
-    var box = boxes[key][kind + "Box"], list = state.readings[key][kind]; box.innerHTML = "";
-    if (!list.length) box.appendChild(el("p", "mut", "No photos yet."));
-    list.forEach(function (it, i) {
-      var row = el("div", "img"), img = el("img"); img.alt = ""; img.src = it.data || it.src; row.appendChild(img);
-      var side = el("div"), cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (for example: Page 1 with annotations)"; cap.value = it.alt || "";
-      cap.addEventListener("input", function () { it.alt = cap.value; }); side.appendChild(cap);
-      var r = el("div", "row");
-      function mk(label, fn) { var b = el("button", "sm", label); b.type = "button"; b.addEventListener("click", function () { grab(key); fn(); drawImgs(key, kind); }); r.appendChild(b); }
-      if (i > 0) mk("Move up", function () { list.splice(i - 1, 0, list.splice(i, 1)[0]); });
-      if (i < list.length - 1) mk("Move down", function () { list.splice(i + 1, 0, list.splice(i, 1)[0]); });
-      mk("Remove", function () { list.splice(i, 1); });
-      side.appendChild(r); row.appendChild(side); box.appendChild(row);
-    });
+    var pc = el("div", "card"); pc.appendChild(el("h2", "", "Proposal"));
+    fields.proposal = el("input"); fields.proposal.type = "text"; fields.proposal.value = state.proposal.link; fields.proposal.placeholder = "https://drive.google.com/...";
+    field(pc, "Proposal: paste your Drive link", fields.proposal); host.appendChild(pc);
   }
   function paras(t) { return t.split(/\n\s*\n/).map(function (s) { return s.trim(); }).filter(Boolean); }
-  function grab(key) {
-    var R = state.readings[key], b = boxes[key];
-    R.link = b.link.value.trim(); R.analysis = paras(b.analysis.value); R.summary = paras(b.summary.value);
-  }
-  function grabAll() { state.student = $("#student").value.trim(); state.register = $("#register").value.trim(); READINGS.forEach(function (r) { grab(r[0]); }); }
 
-  // ---- save
   $("#save").addEventListener("click", function () {
     if (busy) return;
-    grabAll();
-    var bad = READINGS.filter(function (r) { var l = state.readings[r[0]].link; return l && !/^https?:\/\//i.test(l); });
-    if (bad.length) { say("The essay link for \"" + bad[0][1] + "\" must start with https://", "err"); return; }
-    busy = true; $("#save").disabled = true;
-    var jobs = [];
-    READINGS.forEach(function (r) { ["scans", "notes"].forEach(function (k) { state.readings[r[0]][k].forEach(function (it) { if (it.data) jobs.push({ key: r[0], kind: k, it: it }); }); }); });
-    var n = 0, stamp = Date.now();
-    jobs.reduce(function (p, j) {
-      return p.then(function () {
-        n++; say("Uploading photo " + n + " of " + jobs.length + "...");
-        var path = "images/" + j.key + "-" + j.kind + "-" + stamp + "-" + n + ".jpg";
-        return api("PUT", path, { message: "Add photo", content: j.it.data.split(",")[1] }).then(function () { j.it.src = path; delete j.it.data; });
-      });
-    }, Promise.resolve()).then(function () {
-      say("Saving your text...");
-      return api("GET", "content.js").then(function (j) { return j.sha; }, function (e) { if (e.status === 404) return null; throw e; });
-    }).then(function (latest) {
-      var out = JSON.parse(JSON.stringify(state, function (k, v) { return k === "data" ? undefined : v; }));
-      var text = "/* This file is written by edit.html. You normally never open it. */\nwindow.PORTFOLIO = " + JSON.stringify(out, null, 2) + ";\n";
-      var body = { message: "Update portfolio content", content: b64encode(text) }; if (latest) body.sha = latest;
-      return api("PUT", "content.js", body);
-    }).then(function (j) {
-      sha = j.content && j.content.sha; show(); say("Saved. Your site will show the changes in about a minute. Refresh it with Ctrl + Shift + R.", "ok");
-    }).catch(function (e) { say(friendly(e), "err"); }).then(function () { busy = false; $("#save").disabled = false; });
+    var out = { student: $("#student").value.trim(), register: $("#register").value.trim(), readings: {}, proposal: { link: fields.proposal.value.trim() } };
+    var links = [[out.proposal.link, "Proposal"]];
+    READINGS.forEach(function (r) {
+      var f = fields[r[0]];
+      out.readings[r[0]] = { byline: f.byline.value.trim(), link: f.link.value.trim(), reflection: paras(f.reflection.value) };
+      links.push([out.readings[r[0]].link, r[1]]);
+    });
+    for (var i = 0; i < links.length; i++) if (links[i][0] && !/^https?:\/\//i.test(links[i][0])) { say("The link for \"" + links[i][1] + "\" must start with https://", "err"); return; }
+    busy = true; $("#save").disabled = true; say("Saving...");
+    api("GET", "content.js").then(function (j) { return j.sha; }, function (e) { if (e.status === 404) return null; throw e; })
+      .then(function (sha) {
+        var text = "/* This file is written by edit.html. You normally never open it. */\nwindow.PORTFOLIO = " + JSON.stringify(out, null, 2) + ";\n";
+        var body = { message: "Update portfolio content", content: b64encode(text) }; if (sha) body.sha = sha;
+        return api("PUT", "content.js", body);
+      })
+      .then(function () { state = normalise(out); say("Saved. Your site will show the changes in about a minute. Refresh it with Ctrl + Shift + R.", "ok"); })
+      .catch(function (e) { say(friendly(e), "err"); })
+      .then(function () { busy = false; $("#save").disabled = false; });
   });
 })();
 </script>

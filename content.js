@@ -4,18 +4,17 @@ window.PORTFOLIO = {
   "register": "",
   "readings": {
     "author": {
+      "byline": "Michel Foucault, 1969",
       "link": "",
-      "scans": [],
-      "analysis": [],
-      "notes": [],
-      "summary": []
+      "reflection": []
     },
     "derrida": {
+      "byline": "Jacques Derrida, 1966",
       "link": "https://drive.google.com/drive/folders/1PmqhMpdCKTJaw_ESgnLGg8Y3mxKo1mNi?usp=sharing",
-      "scans": [],
-      "analysis": [],
-      "notes": [],
-      "summary": []
+      "reflection": []
     }
+  },
+  "proposal": {
+    "link": ""
   }
 };

@@ -1,72 +1,41 @@
-/* Fills each reading page from content.js, adds a zoom view for scans, and shows upload status on the contents page. */
+/* Fills the pages from content.js. Nothing here needs editing. */
 (function () {
   "use strict";
-  var P = window.PORTFOLIO || { readings: {} };
-  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var P = window.PORTFOLIO || {};
+  var $$ = function (s) { return document.querySelectorAll(s); };
   function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt) e.textContent = txt; return e; }
+  function okUrl(u) { return /^https?:\/\//i.test((u || "").trim()); }
 
-  // student name in footer / header
   var who = (P.student || "").trim(), reg = (P.register || "").trim();
-  document.querySelectorAll("[data-student]").forEach(function (n) { n.textContent = who ? who + (reg ? " (" + reg + ")" : "") : ""; if (!who) n.hidden = true; });
+  $$("[data-student]").forEach(function (n) { n.textContent = who ? who + (reg ? " (" + reg + ")" : "") : ""; if (!who) n.hidden = true; });
 
-  // lightbox
-  var dlg = document.createElement("dialog"); dlg.className = "lightbox"; dlg.setAttribute("aria-label", "Enlarged page");
-  dlg.innerHTML = '<button type="button">Close</button><img alt=""><p class="cap"></p>';
-  document.body.appendChild(dlg);
-  var canDialog = typeof dlg.showModal === "function";
-  dlg.querySelector("button").addEventListener("click", function () { dlg.close ? dlg.close() : dlg.removeAttribute("open"); });
-  dlg.addEventListener("click", function (e) { if (e.target === dlg && dlg.close) dlg.close(); });
-  function openBox(item) {
-    if (!canDialog) { window.open(item.src, "_blank"); return; }
-    dlg.querySelector("img").src = item.src; dlg.querySelector("img").alt = item.alt || "";
-    dlg.querySelector(".cap").textContent = item.alt || ""; dlg.showModal();
-  }
-
-  function renderScans(box, list, emptyMsg) {
+  function renderLink(box, url) {
     box.innerHTML = "";
-    if (!list || !list.length) { if (emptyMsg) box.appendChild(el("p", "empty", emptyMsg)); return; }
-    var grid = el("div", "scans");
-    list.forEach(function (it, i) {
-      var f = el("figure", "scan"), b = el("button"), img = el("img");
-      b.type = "button"; b.setAttribute("aria-label", "Enlarge " + (it.alt || "page " + (i + 1)));
-      img.src = it.src; img.alt = it.alt || "Scanned page " + (i + 1); img.loading = "lazy";
-      b.appendChild(img); f.appendChild(b); if (it.alt) f.appendChild(el("figcaption", "", it.alt));
-      b.addEventListener("click", function () { openBox(it); });
-      grid.appendChild(f);
-    });
-    box.appendChild(grid);
+    if (!okUrl(url)) { var sec = box.closest("[data-section]"); if (sec) sec.hidden = true; return; }
+    var p = el("p", "readlink"), a = el("a", "", url.trim());
+    a.href = url.trim(); a.target = "_blank"; a.rel = "noopener"; p.appendChild(a); box.appendChild(p);
   }
   function renderText(box, list, emptyMsg) {
     box.innerHTML = "";
     if (!list || !list.length) { box.appendChild(el("p", "empty", emptyMsg)); return; }
-    var d = el("div", "prose"); list.forEach(function (p) { d.appendChild(el("p", "", p)); }); box.appendChild(d);
-  }
-
-  function renderLink(box, url) {
-    box.innerHTML = ""; url = (url || "").trim();
-    if (!/^https?:\/\//i.test(url)) return;
-    var p = el("p", "readlink"), a = el("a", "", url);
-    a.href = url; a.target = "_blank"; a.rel = "noopener";
-    p.appendChild(document.createTextNode("Essay link: ")); p.appendChild(a); box.appendChild(p);
+    var d = el("div", "prose"); list.forEach(function (t) { d.appendChild(el("p", "", t)); }); box.appendChild(d);
   }
 
   var page = document.body.getAttribute("data-reading");
   if (page) {
     var R = (P.readings || {})[page] || {};
-    document.querySelectorAll("[data-slot]").forEach(function (box) {
+    $$("[data-slot]").forEach(function (box) {
       var k = box.getAttribute("data-slot");
+      if (k === "byline" && (R.byline || "").trim()) box.textContent = R.byline.trim();
       if (k === "link") renderLink(box, R.link);
-      if (k === "scans") renderScans(box, R.scans, "");
-      if (k === "notes") renderScans(box, R.notes, "Scanned class notes will be added here.");
-      if (k === "analysis") renderText(box, R.analysis, "The analysis of this essay will be added here.");
-      if (k === "summary") renderText(box, R.summary, "The summary of learning will be added here.");
+      if (k === "reflection") renderText(box, R.reflection, "My reflection will be added here.");
     });
   }
+  $$('[data-slot="plink"]').forEach(function (box) { box.innerHTML = ""; if (okUrl((P.proposal || {}).link)) renderLink(box, P.proposal.link); });
 
-  // contents page status
-  document.querySelectorAll("[data-state-for]").forEach(function (s) {
-    var R = (P.readings || {})[s.getAttribute("data-state-for")] || {};
-    var n = (R.scans || []).length;
-    if (n) { s.textContent = n + (n === 1 ? " page" : " pages") + " uploaded"; s.setAttribute("data-s", "live"); }
+  // contents page badges
+  $$("[data-state-for]").forEach(function (s) {
+    var k = s.getAttribute("data-state-for"), link = k === "proposal" ? (P.proposal || {}).link : ((P.readings || {})[k] || {}).link;
+    if (okUrl(link)) { s.textContent = "Drive link added"; s.setAttribute("data-s", "live"); }
   });
 })();
