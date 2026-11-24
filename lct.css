@@ -117,3 +117,8 @@ footer { border-top: 1px solid var(--rule); padding: 28px 0 44px; color: var(--g
 .proposal [data-slot="plink"] .readlink { margin: 0; font-size: 18px; max-width: 60ch; }
 .readlink { margin: 0; }
 .proposal .label { transform: none; display: block; font: 700 24px/1.2 var(--serif); color: var(--ink); margin: 40px 0 8px; }
+
+/* proposal page: title, then Proposal and Photos sections */
+.proposal { min-height: 0; display: block; padding: clamp(36px, 6vw, 64px) 0 clamp(18px, 3vw, 30px); }
+.proposal h1 { font-size: clamp(34px, 6vw, 72px); max-width: 16ch; }
+.proposal .underline { margin-top: 22px; }

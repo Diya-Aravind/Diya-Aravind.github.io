@@ -15,6 +15,7 @@ window.PORTFOLIO = {
     }
   },
   "proposal": {
-    "link": ""
+    "link": "",
+    "photos": []
   }
 };

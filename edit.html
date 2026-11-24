@@ -82,7 +82,7 @@ hr{border:0;border-top:1px solid #cfd6e1;margin:26px 0}
   var $ = function (s, r) { return (r || document).querySelector(s); };
   function el(t, c, x) { var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
   var READINGS = [["author", "What Is an Author?", "Michel Foucault, 1969"], ["derrida", "Structure, Sign, and Play in the Discourse of the Human Sciences", "Jacques Derrida, 1966"]];
-  var state = null, conn = {}, busy = false, fields = {};
+  var state = null, conn = {}, busy = false, fields = {}, boxPhotos = null;
 
   var host = location.hostname;
   if (/\.github\.io$/i.test(host)) { $("#owner").value = host.split(".")[0]; $("#repo").value = host; }
@@ -116,7 +116,7 @@ hr{border:0;border-top:1px solid #cfd6e1;margin:26px 0}
     return w.PORTFOLIO || {};
   }
   function normalise(P) {
-    var out = { student: P.student || "", register: P.register || "", readings: {}, proposal: { link: ((P.proposal || {}).link) || "" } };
+    var out = { student: P.student || "", register: P.register || "", readings: {}, proposal: { link: ((P.proposal || {}).link) || "", photos: (((P.proposal || {}).photos) || []).map(function (x) { return { src: x.src, alt: x.alt || "" }; }) } };
     READINGS.forEach(function (r) {
       var R = (P.readings || {})[r[0]] || {};
       out.readings[r[0]] = { byline: R.byline || r[2], link: R.link || "", reflection: Array.isArray(R.reflection) ? R.reflection : (Array.isArray(R.analysis) ? R.analysis : []) };
@@ -153,13 +153,57 @@ hr{border:0;border-top:1px solid #cfd6e1;margin:26px 0}
     });
     var pc = el("div", "card"); pc.appendChild(el("h2", "", "Proposal"));
     fields.proposal = el("input"); fields.proposal.type = "text"; fields.proposal.value = state.proposal.link; fields.proposal.placeholder = "https://drive.google.com/...";
-    field(pc, "Proposal: paste your Drive link", fields.proposal); host.appendChild(pc);
+    field(pc, "Proposal: paste your Drive link", fields.proposal);
+    pc.appendChild(el("h3", "", "Photos"));
+    boxPhotos = el("div", "imgs"); pc.appendChild(boxPhotos); pc.appendChild(adder()); drawPhotos();
+    host.appendChild(pc);
+  }
+  function adder() {
+    var row = el("div", "row"), inp = el("input"); inp.type = "file"; inp.accept = "image/*"; inp.multiple = true; inp.style.display = "none";
+    var btn = el("button", "", "Add photos"); btn.type = "button";
+    btn.addEventListener("click", function () { inp.click(); });
+    inp.addEventListener("change", function () {
+      var files = Array.prototype.slice.call(inp.files); inp.value = "";
+      files.reduce(function (p, f) {
+        return p.then(function () { return shrink(f).then(function (d) { state.proposal.photos.push({ src: "", alt: "", data: d }); }); })
+          .catch(function (e) { say(e.message, "err"); });
+      }, Promise.resolve()).then(drawPhotos);
+    });
+    row.appendChild(btn); row.appendChild(inp); return row;
+  }
+  function shrink(file) {
+    return new Promise(function (res, rej) {
+      var url = URL.createObjectURL(file), im = new Image();
+      im.onload = function () {
+        var s = Math.min(1, 2000 / Math.max(im.naturalWidth, im.naturalHeight)), c = document.createElement("canvas");
+        c.width = Math.round(im.naturalWidth * s); c.height = Math.round(im.naturalHeight * s);
+        var x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url); res(c.toDataURL("image/jpeg", 0.88));
+      };
+      im.onerror = function () { URL.revokeObjectURL(url); rej(new Error("Could not open " + file.name + ". Use a JPG or PNG photo.")); };
+      im.src = url;
+    });
+  }
+  function drawPhotos() {
+    var box = boxPhotos, list = state.proposal.photos; box.innerHTML = "";
+    if (!list.length) box.appendChild(el("p", "mut", "No photos yet."));
+    list.forEach(function (it, i) {
+      var row = el("div", "img"), img = el("img"); img.alt = ""; img.src = it.data || it.src; row.appendChild(img);
+      var side = el("div"), cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.value = it.alt || "";
+      cap.addEventListener("input", function () { it.alt = cap.value; }); side.appendChild(cap);
+      var r = el("div", "row");
+      function mk(label, fn) { var b = el("button", "sm", label); b.type = "button"; b.addEventListener("click", function () { fn(); drawPhotos(); }); r.appendChild(b); }
+      if (i > 0) mk("Move up", function () { list.splice(i - 1, 0, list.splice(i, 1)[0]); });
+      if (i < list.length - 1) mk("Move down", function () { list.splice(i + 1, 0, list.splice(i, 1)[0]); });
+      mk("Remove", function () { list.splice(i, 1); });
+      side.appendChild(r); row.appendChild(side); box.appendChild(row);
+    });
   }
   function paras(t) { return t.split(/\n\s*\n/).map(function (s) { return s.trim(); }).filter(Boolean); }
 
   $("#save").addEventListener("click", function () {
     if (busy) return;
-    var out = { student: $("#student").value.trim(), register: $("#register").value.trim(), readings: {}, proposal: { link: fields.proposal.value.trim() } };
+    var out = { student: $("#student").value.trim(), register: $("#register").value.trim(), readings: {}, proposal: { link: fields.proposal.value.trim(), photos: [] } };
     var links = [[out.proposal.link, "Proposal"]];
     READINGS.forEach(function (r) {
       var f = fields[r[0]];
@@ -167,14 +211,23 @@ hr{border:0;border-top:1px solid #cfd6e1;margin:26px 0}
       links.push([out.readings[r[0]].link, r[1]]);
     });
     for (var i = 0; i < links.length; i++) if (links[i][0] && !/^https?:\/\//i.test(links[i][0])) { say("The link for \"" + links[i][1] + "\" must start with https://", "err"); return; }
-    busy = true; $("#save").disabled = true; say("Saving...");
-    api("GET", "content.js").then(function (j) { return j.sha; }, function (e) { if (e.status === 404) return null; throw e; })
+    busy = true; $("#save").disabled = true;
+    var photos = state.proposal.photos, jobs = photos.filter(function (p) { return p.data; }), n = 0, stamp = Date.now();
+    jobs.reduce(function (p, it) {
+      return p.then(function () {
+        n++; say("Uploading photo " + n + " of " + jobs.length + "...");
+        var path = "images/proposal-" + stamp + "-" + n + ".jpg";
+        return api("PUT", path, { message: "Add photo", content: it.data.split(",")[1] }).then(function () { it.src = path; delete it.data; });
+      });
+    }, Promise.resolve())
+      .then(function () { say("Saving..."); return api("GET", "content.js").then(function (j) { return j.sha; }, function (e) { if (e.status === 404) return null; throw e; }); })
       .then(function (sha) {
+        out.proposal.photos = photos.map(function (x) { return { src: x.src, alt: x.alt || "" }; });
         var text = "/* This file is written by edit.html. You normally never open it. */\nwindow.PORTFOLIO = " + JSON.stringify(out, null, 2) + ";\n";
         var body = { message: "Update portfolio content", content: b64encode(text) }; if (sha) body.sha = sha;
         return api("PUT", "content.js", body);
       })
-      .then(function () { state = normalise(out); say("Saved. Your site will show the changes in about a minute. Refresh it with Ctrl + Shift + R.", "ok"); })
+      .then(function () { state = normalise(out); drawPhotos(); say("Saved. Your site will show the changes in about a minute. Refresh it with Ctrl + Shift + R.", "ok"); })
       .catch(function (e) { say(friendly(e), "err"); })
       .then(function () { busy = false; $("#save").disabled = false; });
   });

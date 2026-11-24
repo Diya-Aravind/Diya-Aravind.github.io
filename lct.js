@@ -21,6 +21,33 @@
     var d = el("div", "prose"); list.forEach(function (t) { d.appendChild(el("p", "", t)); }); box.appendChild(d);
   }
 
+  // lightbox for photos
+  var dlg = document.createElement("dialog"); dlg.className = "lightbox"; dlg.setAttribute("aria-label", "Enlarged photo");
+  dlg.innerHTML = '<button type="button">Close</button><img alt=""><p class="cap"></p>';
+  document.body.appendChild(dlg);
+  var canDialog = typeof dlg.showModal === "function";
+  dlg.querySelector("button").addEventListener("click", function () { if (dlg.close) dlg.close(); else dlg.removeAttribute("open"); });
+  dlg.addEventListener("click", function (e) { if (e.target === dlg && dlg.close) dlg.close(); });
+  function openBox(it) {
+    if (!canDialog) { window.open(it.src, "_blank"); return; }
+    dlg.querySelector("img").src = it.src; dlg.querySelector("img").alt = it.alt || "";
+    dlg.querySelector(".cap").textContent = it.alt || ""; dlg.showModal();
+  }
+  function renderPhotos(box, list) {
+    box.innerHTML = "";
+    if (!list || !list.length) return;
+    var grid = el("div", "scans");
+    list.forEach(function (it, i) {
+      var f = el("figure", "scan"), b = el("button"), img = el("img");
+      b.type = "button"; b.setAttribute("aria-label", "Enlarge " + (it.alt || "photo " + (i + 1)));
+      img.src = it.src; img.alt = it.alt || "Photo " + (i + 1); img.loading = "lazy";
+      b.appendChild(img); f.appendChild(b); if (it.alt) f.appendChild(el("figcaption", "", it.alt));
+      b.addEventListener("click", function () { openBox(it); });
+      grid.appendChild(f);
+    });
+    box.appendChild(grid);
+  }
+
   var page = document.body.getAttribute("data-reading");
   if (page) {
     var R = (P.readings || {})[page] || {};
@@ -32,6 +59,7 @@
     });
   }
   $$('[data-slot="plink"]').forEach(function (box) { box.innerHTML = ""; if (okUrl((P.proposal || {}).link)) renderLink(box, P.proposal.link); });
+  $$('[data-slot="photos"]').forEach(function (box) { renderPhotos(box, (P.proposal || {}).photos); });
 
   // contents page badges
   $$("[data-state-for]").forEach(function (s) {
