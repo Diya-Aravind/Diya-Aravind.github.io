@@ -107,5 +107,5 @@ footer { border-top: 1px solid var(--rule); padding: 28px 0 44px; color: var(--g
 }
 @media print { .bar, .pager, .skip { display: none; } body { background: #fff; color: #000; } }
 
-.readlink { margin: 18px 0 0; color: var(--graphite); font-size: 16px; max-width: 62ch; }
+.readlink { margin: 0 0 14px; color: var(--graphite); font-size: 16px; max-width: 62ch; }
 .readlink a { color: var(--link); overflow-wrap: anywhere; user-select: all; }
