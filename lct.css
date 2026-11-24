@@ -109,3 +109,6 @@ footer { border-top: 1px solid var(--rule); padding: 28px 0 44px; color: var(--g
 
 .readlink { margin: 0 0 14px; color: var(--graphite); font-size: 16px; max-width: 62ch; }
 .readlink a { color: var(--link); overflow-wrap: anywhere; user-select: all; }
+
+/* hide the placeholder under Annotated essay */
+[data-slot="scans"] .empty { display: none; }
